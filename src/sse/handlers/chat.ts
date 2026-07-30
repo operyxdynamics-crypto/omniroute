@@ -87,6 +87,7 @@ import {
   shouldTripProviderBreakerForResult,
 } from "./chatPredicates";
 import { connectionHasExtraKeys } from "@omniroute/open-sse/services/apiKeyRotator.ts";
+import { wrapResponseWithOAuthSessionRelease } from "@omniroute/open-sse/services/oauthSessionOccupancy.ts";
 import {
   extractReasoningIntent,
   type ExtractedReasoningIntent,
@@ -780,7 +781,12 @@ async function handleChatImplementation(
       );
       if (!creds || creds.allRateLimited) return false;
 
-      comboPreselectedCredentials.set(getComboCredentialCacheKey(modelString, target), creds);
+      // OAuth selection must happen atomically with occupancy reservation in the
+      // actual dispatch. Availability preflight may finish well before a combo
+      // target runs, so caching OAuth credentials here would reintroduce a race.
+      if (creds.authType !== "oauth") {
+        comboPreselectedCredentials.set(getComboCredentialCacheKey(modelString, target), creds);
+      }
       return true;
     };
 
@@ -794,21 +800,12 @@ async function handleChatImplementation(
     // Per-request Auto-Combo controls (#6023 / #6024 / #6025 / #3470): steer an
     // `auto` combo on this single request without mutating its stored config.
     const perRequestAutoControls = resolveRequestAutoControls(request.headers);
-    const relayOptions =
-      combo.strategy === "context-relay" ||
-      bypassProviderQuotaPolicy ||
-      Object.keys(perRequestAutoControls).length > 0
-        ? {
-            ...(combo.strategy === "context-relay"
-              ? {
-                  sessionId,
-                  config: relayConfig,
-                }
-              : {}),
-            ...(bypassProviderQuotaPolicy ? { bypassProviderQuotaPolicy: true } : {}),
-            ...perRequestAutoControls,
-          }
-        : undefined;
+    const relayOptions = {
+      sessionId,
+      ...(combo.strategy === "context-relay" ? { config: relayConfig } : {}),
+      ...(bypassProviderQuotaPolicy ? { bypassProviderQuotaPolicy: true } : {}),
+      ...perRequestAutoControls,
+    };
     telemetry.endPhase();
 
     // Context-relay keeps generation in combo.ts, but handoff injection lives here
@@ -849,9 +846,12 @@ async function handleChatImplementation(
             comboExecutionKey: target?.executionKey || target?.stepId || null,
             skipUpstreamRetry: target?.failoverBeforeRetry ?? false,
             allowRateLimitedConnection: target?.allowRateLimitedConnection === true,
-            preselectedCredentials: comboPreselectedCredentials.get(
-              getComboCredentialCacheKey(m, target)
-            ),
+            preselectedCredentials: (() => {
+              const key = getComboCredentialCacheKey(m, target);
+              const credentials = comboPreselectedCredentials.get(key);
+              comboPreselectedCredentials.delete(key);
+              return credentials;
+            })(),
             cachedSettings: settings,
             providerId: target?.providerId ?? null,
             correlationId: reqId,
@@ -892,6 +892,11 @@ async function handleChatImplementation(
       signal: request?.signal ?? null,
       correlationId: reqId,
     });
+
+    for (const credentials of comboPreselectedCredentials.values()) {
+      credentials.releaseOAuthSession?.();
+    }
+    comboPreselectedCredentials.clear();
 
     // ── Global Fallback Provider (#689) ────────────────────────────────────
     // If combo exhausted all models, try the global fallback before giving up.
@@ -1277,13 +1282,17 @@ async function handleSingleModelChat(
   // re-attempt to exactly one for the whole request. Declared outside both retry
   // loops so it can never reset and loop.
   let streamEarlyEofRetries = 0;
+  const occupancySessionKey =
+    runtimeOptions.sessionAffinityKey ?? runtimeOptions.sessionId ?? `request:${randomUUID()}`;
+  let initialPreselectedCredentials = runtimeOptions.preselectedCredentials;
 
   requestAttemptLoop: while (true) {
     const excludedConnectionIds = new Set<string>();
     let lastError = requestRetryLastError;
     let lastStatus = requestRetryLastStatus;
     let lastCooldownMs = requestRetryLastCooldownMs;
-    let preselectedCredentials = runtimeOptions.preselectedCredentials;
+    let preselectedCredentials = initialPreselectedCredentials;
+    initialPreselectedCredentials = null;
 
     while (true) {
       const credentials =
@@ -1295,7 +1304,8 @@ async function handleSingleModelChat(
               effectiveAllowedConnections,
               model,
               {
-                sessionKey: runtimeOptions.sessionAffinityKey ?? runtimeOptions.sessionId ?? null,
+                sessionKey: occupancySessionKey,
+                reserveOAuthSession: true,
                 excludeConnectionIds: Array.from(excludedConnectionIds),
                 ...(runtimeOptions.allowRateLimitedConnection
                   ? { allowRateLimitedConnections: true }
@@ -1385,6 +1395,7 @@ async function handleSingleModelChat(
       }
 
       const accountId = credentials.connectionId.slice(0, 8);
+      const releaseOAuthSession = credentials.releaseOAuthSession ?? (() => {});
       log.info("AUTH", `Using ${provider} account: ${accountId}...`);
       // #474: when the request used a bare model name (no "/" — e.g. an alias
       // that resolved to "auto") and the selected connection declares a
@@ -1406,7 +1417,10 @@ async function handleSingleModelChat(
           reasoningDecision: runtimeOptions.reasoningDecision,
           requestRoutingTags: runtimeOptions.reasoningRequestTags,
         });
-        if (connectionRouting.response) return connectionRouting.response;
+        if (connectionRouting.response) {
+          releaseOAuthSession();
+          return connectionRouting.response;
+        }
         requestBody = connectionRouting.body;
       }
       let injectedHandoff = null;
@@ -1431,7 +1445,13 @@ async function handleSingleModelChat(
           );
         }
       }
-      const refreshedCredentials = await checkAndRefreshToken(provider, credentials);
+      let refreshedCredentials;
+      try {
+        refreshedCredentials = await checkAndRefreshToken(provider, credentials);
+      } catch (error) {
+        releaseOAuthSession();
+        throw error;
+      }
       const storeEnabled = isOpenAIResponsesStoreEnabled(
         refreshedCredentials?.providerSpecificData ?? credentials?.providerSpecificData
       );
@@ -1461,52 +1481,64 @@ async function handleSingleModelChat(
           refreshedCredentials
         );
       }
-      const proxyInfo = await safeResolveProxy(credentials.connectionId, apiKeyInfo?.id, provider);
+      let proxyInfo;
+      try {
+        proxyInfo = await safeResolveProxy(credentials.connectionId, apiKeyInfo?.id, provider);
+      } catch (error) {
+        releaseOAuthSession();
+        throw error;
+      }
       // #5217: sink for the proxy the executor pins internally (e.g. OpencodeExecutor
       // rotation) so the egress log below reflects the real egress, not "direct".
       const appliedProxySink: { proxy: unknown } = { proxy: null };
       const proxyStartTime = Date.now();
-
       // 4. Execute chat via core after breaker gate checks (with optional TLS tracking)
       if (telemetry) telemetry.startPhase("connect");
       const dispatchClientRawRequest = resolveDispatchClientRawRequest(
         clientRawRequest,
         runtimeOptions.modelAbortSignal
       );
-      const execution = await executeChatWithBreaker({
-        bypassCircuitBreaker: forceLiveComboTest || hasForcedConnection,
-        breaker,
-        body: requestBody,
-        provider,
-        model: effectiveModel,
-        refreshedCredentials,
-        proxyInfo,
-        appliedProxySink,
-        log,
-        clientRawRequest: dispatchClientRawRequest,
-        credentials,
-        apiKeyInfo,
-        userAgent,
-        comboName,
-        comboStrategy,
-        isCombo,
-        comboStepId: runtimeOptions.comboStepId ?? null,
-        comboExecutionKey: runtimeOptions.comboExecutionKey ?? runtimeOptions.comboStepId ?? null,
-        extendedContext,
-        modelApiFormat: apiFormat,
-        modelTargetFormat: targetFormat,
-        providerProfile,
-        cachedSettings: runtimeOptions.cachedSettings,
-        skipUpstreamRetry: runtimeOptions.skipUpstreamRetry ?? false,
-        correlationId: runtimeOptions?.correlationId ?? null,
-        modelPinned: runtimeOptions?.modelPinned ?? false,
-        routingComboId: runtimeOptions?.routingComboId ?? null,
-      });
+      let execution: Awaited<ReturnType<typeof executeChatWithBreaker>>;
+      try {
+        execution = await executeChatWithBreaker({
+          bypassCircuitBreaker: forceLiveComboTest || hasForcedConnection,
+          breaker,
+          body: requestBody,
+          provider,
+          model: effectiveModel,
+          refreshedCredentials,
+          proxyInfo,
+          appliedProxySink,
+          log,
+          clientRawRequest: dispatchClientRawRequest,
+          credentials,
+          apiKeyInfo,
+          userAgent,
+          comboName,
+          comboStrategy,
+          isCombo,
+          comboStepId: runtimeOptions.comboStepId ?? null,
+          comboExecutionKey: runtimeOptions.comboExecutionKey ?? runtimeOptions.comboStepId ?? null,
+          extendedContext,
+          modelApiFormat: apiFormat,
+          modelTargetFormat: targetFormat,
+          providerProfile,
+          cachedSettings: runtimeOptions.cachedSettings,
+          skipUpstreamRetry: runtimeOptions.skipUpstreamRetry ?? false,
+          correlationId: runtimeOptions?.correlationId ?? null,
+          modelPinned: runtimeOptions?.modelPinned ?? false,
+          routingComboId: runtimeOptions?.routingComboId ?? null,
+        });
+      } catch (error) {
+        releaseOAuthSession();
+        throw error;
+      }
       if (telemetry) telemetry.endPhase();
       if ("localResourcePressureResult" in execution) {
         return execution.localResourcePressureResult.response;
       }
       const { result, tlsFingerprintUsed } = execution;
+      if (!result.success) releaseOAuthSession();
 
       const proxyLatency = Date.now() - proxyStartTime;
       const providerAlias = PROVIDER_ID_TO_ALIAS[provider] || provider;
@@ -1541,6 +1573,10 @@ async function handleSingleModelChat(
         }
         if (telemetry) telemetry.startPhase("finalize");
         if (telemetry) telemetry.endPhase();
+        if (requestBody.stream === true) {
+          return wrapResponseWithOAuthSessionRelease(result.response, releaseOAuthSession);
+        }
+        releaseOAuthSession();
         return result.response;
       }
 

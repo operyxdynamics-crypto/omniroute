@@ -112,10 +112,7 @@ export type HandleComboChatOptions = {
   hiddenModelsByProvider?: HiddenModelsByProvider;
 };
 
-export type HandleRoundRobinOptions = Omit<
-  HandleComboChatOptions,
-  "relayOptions" | "apiKeyAllowedConnections"
->;
+export type HandleRoundRobinOptions = Omit<HandleComboChatOptions, "apiKeyAllowedConnections">;
 
 export type HistoricalLatencyStatsEntry = {
   totalRequests?: number;
@@ -165,6 +162,7 @@ export type ResolvedComboTarget = {
   executionKey: string;
   modelStr: string;
   provider: string;
+  authType?: string | null;
   providerId: string | null;
   connectionId: string | null;
   allowedConnectionIds?: string[] | null;
