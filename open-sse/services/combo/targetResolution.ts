@@ -113,6 +113,8 @@ export interface ResolveComboTargetPipelineDeps {
    */
   buildAutoCandidates: ResolveAutoStrategyDeps["buildAutoCandidates"];
   hiddenModelsByProvider?: HiddenModelsByProvider;
+  /** Native Responses clients (for example Codex CLI/Desktop) manage compaction themselves. */
+  clientManagedResponsesContext?: boolean;
 }
 
 export interface ResolvedComboTargetPipeline {
@@ -717,7 +719,9 @@ export async function resolveComboTargetPipeline(
 
   orderedTargets = await applyRequestTagRouting(orderedTargets, body, log);
 
-  const overflow = getKnownContextOverflow(orderedTargets, body);
+  const overflow = getKnownContextOverflow(orderedTargets, body, {
+    clientManagedResponsesContext: deps.clientManagedResponsesContext,
+  });
   if (overflow) {
     return { earlyResponse: buildContextOverflowResponse(overflow, orderedTargets, log) };
   }
