@@ -75,6 +75,7 @@ import {
   formatSessionKeyForLog,
   resolveSessionAffinityTtlMs,
   selectSessionAffinityConnection,
+  syncSessionAffinityRuntimeFields,
 } from "./sessionAffinityPin";
 import {
   isAnonymousFallbackDisabledBySettings,
@@ -1474,6 +1475,7 @@ export async function getProviderCredentials(
     );
     if (affinityConnection) {
       connection = affinityConnection;
+      syncSessionAffinityRuntimeFields(connectionsRaw, connection);
     } else if (options.sessionKey) {
       log.info(
         "AUTH",
