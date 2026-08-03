@@ -180,6 +180,7 @@ function scheduleBackgroundRefresh(
   buildPayload: (request: Request) => Promise<CatalogPayload>
 ): void {
   if (catalogInFlight.has(cacheKey)) return; // a refresh for this key is already running
+  const buildVersion = getModelCatalogCacheVersion();
 
   const generation = getModelCatalogCacheVersion();
   const refreshPromise: Promise<CachedCatalog> = new Promise((resolve, reject) => {
