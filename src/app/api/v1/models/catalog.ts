@@ -767,6 +767,14 @@ async function buildUnifiedModelsResponseCore(
 
         const visionFields =
           getVisionCapabilityFields(aliasId) || getVisionCapabilityFields(model.id);
+        const thinkingFields = getThinkingCapabilityFields(
+          canonicalProviderId,
+          model.id,
+          model.supportsReasoning,
+          model.supportedThinkingEfforts
+        );
+        const thinkingCapabilities =
+          Object.keys(thinkingFields).length > 0 ? { capabilities: thinkingFields } : {};
         if (includeAlias) {
           models.push({
             id: aliasId,
@@ -777,6 +785,8 @@ async function buildUnifiedModelsResponseCore(
             root: model.id,
             parent: null,
             ...(visionFields || {}),
+            ...thinkingFields,
+            ...thinkingCapabilities,
           });
         }
         if (
@@ -797,6 +807,8 @@ async function buildUnifiedModelsResponseCore(
             root: model.id,
             parent: includeAlias ? aliasId : null,
             ...(providerVisionFields || {}),
+            ...thinkingFields,
+            ...thinkingCapabilities,
           });
         }
       }
