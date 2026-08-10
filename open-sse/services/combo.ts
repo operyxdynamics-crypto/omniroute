@@ -1761,6 +1761,7 @@ export async function handleComboChat({
               errorText.includes("RATE_LIMIT_QUEUE_WEDGED");
             recordProviderFailure(provider, log, targetWithConnection.connectionId, profile, {
               isQueueTimeout,
+              isNetworkError: structuredError?.code === "proxy_unreachable",
             });
           }
 
