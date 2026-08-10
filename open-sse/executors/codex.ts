@@ -223,7 +223,6 @@ function convertSystemToDeveloperRole(body: Record<string, unknown>): void {
   }
 }
 
-
 function stripOrphanedCodexFunctionCallOutputs(body: Record<string, unknown>): void {
   if (!Array.isArray(body.input)) return;
   const input = body.input;
@@ -1334,6 +1333,7 @@ export class CodexExecutor extends BaseExecutor {
       dropImageGeneration:
         isCodexFreePlan(credentials?.providerSpecificData) || getCodexModelScope(model) === "spark",
       preserveCustomTools: nativeCodexPassthrough,
+      defaultFunctionStrict: nativeCodexPassthrough ? undefined : false,
     });
 
     // Issue #806: Even for native passthrough, some clients (purist completions) might indiscriminately inject

@@ -83,6 +83,17 @@ test("request log dates follow the active locale without duplicating rotated acc
   );
 });
 
+test("model selector preserves localized copy and empty-value semantics", () => {
+  const source = readRepoFile("src/shared/components/ModelSelectField.tsx");
+
+  for (const key of ["custom", "loadingModels", "selectAModel"]) {
+    assert.match(source, new RegExp(`t\\("${key}"\\)`));
+  }
+  assert.match(source, /allowEmpty = false/);
+  assert.match(source, /placeholderDisabled=\{!allowEmpty\}/);
+  assert.doesNotMatch(source, /"Loading models…"|"Select a model"/);
+});
+
 test("upstream proxy notifications preserve all four localized routing modes", () => {
   const source = readRepoFile(
     "src/app/(dashboard)/dashboard/providers/[id]/providerConnectionText.ts"

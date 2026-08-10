@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button, Badge, Input, Modal, Select, Toggle } from "@/shared/components";
+import { isValidProviderIconUrl } from "@/shared/validation/iconUrl";
 import { CC_COMPATIBLE_DEFAULT_CHAT_PATH } from "../../providerDetailConstants";
 import { providerText } from "../../providerPageHelpers";
 import NewApiAggregatorFields from "./NewApiAggregatorFields";
@@ -58,6 +59,7 @@ export default function EditCompatibleNodeModal({
     method?: string | null;
   }>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [iconUrlError, setIconUrlError] = useState<string | null>(null);
 
   useEffect(() => {
     if (node) {
@@ -102,6 +104,12 @@ export default function EditCompatibleNodeModal({
 
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.prefix.trim() || !formData.baseUrl.trim()) return;
+    const iconUrl = formData.iconUrl.trim();
+    if (!isValidProviderIconUrl(iconUrl)) {
+      setIconUrlError(t("iconUrlInvalid"));
+      return;
+    }
+    setIconUrlError(null);
     setSaving(true);
     try {
       const payload: any = {
@@ -251,7 +259,7 @@ export default function EditCompatibleNodeModal({
           value={formData.iconUrl}
           onChange={(e) => setFormData({ ...formData, iconUrl: e.target.value })}
           placeholder="https://example.com/logo.png"
-          hint={t("iconUrlHint")}
+          hint={iconUrlError ?? t("iconUrlHint")}
         />
         <Toggle
           label={t("newApiAggregatorToggleLabel")}
