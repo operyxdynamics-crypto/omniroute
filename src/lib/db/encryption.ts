@@ -297,14 +297,12 @@ export function decryptConnectionFields<T extends ConnectionFields | null | unde
 
   if (credentialDecryptFailed) {
     const failed: Array<{ field: string; value: unknown }> = [];
-    if (looksEncrypted(row.apiKey) && apiKey === null)
-      failed.push({ field: "apiKey", value: row.apiKey });
+    if (looksEncrypted(row.apiKey) && apiKey === null) failed.push({ field: "apiKey", value: row.apiKey });
     if (looksEncrypted(row.accessToken) && accessToken === null)
       failed.push({ field: "accessToken", value: row.accessToken });
     if (looksEncrypted(row.refreshToken) && refreshToken === null)
       failed.push({ field: "refreshToken", value: row.refreshToken });
-    if (looksEncrypted(row.idToken) && idToken === null)
-      failed.push({ field: "idToken", value: row.idToken });
+    if (looksEncrypted(row.idToken) && idToken === null) failed.push({ field: "idToken", value: row.idToken });
 
     const connectionId = typeof row.id === "string" ? row.id : "";
     const provider = typeof row.provider === "string" ? row.provider : "unknown";

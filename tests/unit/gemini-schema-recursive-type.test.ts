@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { cleanJSONSchemaForAntigravity } =
-  await import("../../open-sse/translator/helpers/geminiHelper.ts");
+const { cleanJSONSchemaForAntigravity } = await import(
+  "../../open-sse/translator/helpers/geminiHelper.ts"
+);
 
 test("#9268 injects type:object on nested properties without type", () => {
   const input = {

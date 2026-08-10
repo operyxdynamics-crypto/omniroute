@@ -118,7 +118,8 @@ export function isPaidTierAutoId(autoId: string): boolean {
  * a candidate filter so the virtual combo only scores vision-capable models.
  */
 export type BuiltinAutoSpec =
-  { variant: AutoVariant | undefined } | { category: AutoCategory; tier?: AutoTier };
+  | { variant: AutoVariant | undefined }
+  | { category: AutoCategory; tier?: AutoTier };
 
 /**
  * Vision-flavored flat ids that MUST resolve to the `vision` category (candidate

@@ -1239,10 +1239,8 @@ export class CursorExecutor extends BaseExecutor {
     if (isToolFollowUp) {
       session = cursorSessionManager.acquire(conversationId);
       // #9029: content-based session match when client lacks conversation_id.
-      if (!session && !body.conversation_id)
-        session = cursorSessionManager.findByToolCallIds(
-          messages.filter((m) => m.role === "tool" && m.tool_call_id).map((m) => m.tool_call_id!)
-        );
+      if (!session && !body.conversation_id) session = cursorSessionManager.findByToolCallIds(
+        messages.filter(m => m.role === "tool" && m.tool_call_id).map(m => m.tool_call_id!));
     }
 
     if (session) {

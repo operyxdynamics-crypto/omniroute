@@ -112,7 +112,8 @@ export function buildAutoCandidateFilter(
     checks.push((c) => {
       try {
         const caps = getResolvedModelCapabilities({ provider: c.provider, model: c.model });
-        const capable = caps.supportsVision === true || isVisionModelId(c.model);
+        const capable =
+          caps.supportsVision === true || isVisionModelId(c.model);
         if (!capable) return false;
         // #vison-pool: registry entries whose catalog OVERSTATES vision support
         // (opencode-go/opencode-zen/tokenrouter — the backend models are text-only)

@@ -79,7 +79,9 @@ const BUILTIN_PROVIDERS_SYSTEM_MUST_BE_FIRST = new Set(["xiaomi-mimo", "mimo"]);
  * Parses OMNIROUTE_STRICT_SYSTEM_PROVIDERS into a normalized id list.
  * Exported for tests; not expected to be called directly by other modules.
  */
-export function parseStrictSystemProvidersEnv(env: NodeJS.ProcessEnv = process.env): string[] {
+export function parseStrictSystemProvidersEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
   const raw = env.OMNIROUTE_STRICT_SYSTEM_PROVIDERS ?? "";
   return raw
     .split(",")
@@ -100,7 +102,7 @@ function resolveProvidersSystemMustBeFirst(env: NodeJS.ProcessEnv = process.env)
  */
 export function systemMessageMustBeFirst(
   provider: string | null | undefined,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   if (!provider) return false;
   const normalized = provider.toLowerCase().trim();

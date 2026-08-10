@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { createSSETransformStreamWithLogger } = await import("../../open-sse/utils/stream.ts");
+const { createSSETransformStreamWithLogger } = await import(
+  "../../open-sse/utils/stream.ts"
+);
 const { FORMATS } = await import("../../open-sse/translator/formats.ts");
 
 async function drainTransform(

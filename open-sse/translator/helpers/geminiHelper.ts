@@ -702,7 +702,10 @@ export function cleanJSONSchemaForAntigravity(schema: unknown): unknown {
     }
 
     const record = obj as JsonRecord;
-    if (!record.type && (record.properties !== undefined || record.required !== undefined)) {
+    if (
+      !record.type &&
+      (record.properties !== undefined || record.required !== undefined)
+    ) {
       record.type = "object";
     }
 

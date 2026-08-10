@@ -15,6 +15,7 @@
 import { CORS_HEADERS } from "../utils/cors";
 import { createHash } from "crypto";
 
+
 const OMNIROUTE_CHAT_VIRTUAL_TTL_MS = parsePositiveInt(
   process.env.OMNIROUTE_CHAT_VIRTUAL_TTL_MS,
   60_000
@@ -369,9 +370,7 @@ export class PerConnectionAdmissionController {
   }
 }
 
-export const perConnectionAdmissionController = new PerConnectionAdmissionController(
-  CHAT_MAX_HEAVY_IN_FLIGHT
-);
+export const perConnectionAdmissionController = new PerConnectionAdmissionController(CHAT_MAX_HEAVY_IN_FLIGHT);
 
 export type ChatRequestAdmission =
   | { admit: true; request: Request; lease: ChatAdmissionLease | null }

@@ -218,24 +218,20 @@ test("aborting the admission wait settles early, grants no lease, and removes th
     settledAfterAbort = true;
   });
   await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(
-    settledAfterAbort,
-    true,
-    "abort must settle the wait promptly, not park for queueMs"
-  );
+  assert.equal(settledAfterAbort, true, "abort must settle the wait promptly, not park for queueMs");
 
   const lease = await pending;
   assert.equal(lease, null, "abort must not grant a lease");
-  assert.equal(
-    controller.activeHeavy,
-    1,
-    "the holder keeps its lease; the aborted wait consumed nothing"
-  );
+  assert.equal(controller.activeHeavy, 1, "the holder keeps its lease; the aborted wait consumed nothing");
 
   // Releasing must NOT wake the removed waiter: capacity stays free.
   held.release();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(controller.activeHeavy, 0, "releasing after abort must not wake the removed waiter");
+  assert.equal(
+    controller.activeHeavy,
+    0,
+    "releasing after abort must not wake the removed waiter"
+  );
 });
 
 test("aborting the head waiter preserves FIFO order for remaining waiters", async () => {

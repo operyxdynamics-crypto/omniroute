@@ -39,7 +39,10 @@ describe("nanogpt endpoint surface (#9322)", () => {
 
   describe("audio speech", () => {
     it("is registered in AUDIO_SPEECH_PROVIDERS", () => {
-      assert.ok(AUDIO_SPEECH_PROVIDERS.nanogpt, "nanogpt should be in AUDIO_SPEECH_PROVIDERS");
+      assert.ok(
+        AUDIO_SPEECH_PROVIDERS.nanogpt,
+        "nanogpt should be in AUDIO_SPEECH_PROVIDERS"
+      );
     });
 
     it("resolves nanogpt speech config", () => {
@@ -59,7 +62,10 @@ describe("nanogpt endpoint surface (#9322)", () => {
 
   describe("video generation", () => {
     it("is registered in VIDEO_PROVIDERS", () => {
-      assert.ok(VIDEO_PROVIDERS.nanogpt, "nanogpt should be in VIDEO_PROVIDERS");
+      assert.ok(
+        VIDEO_PROVIDERS.nanogpt,
+        "nanogpt should be in VIDEO_PROVIDERS"
+      );
     });
 
     it("resolves nanogpt video config", () => {
@@ -79,7 +85,10 @@ describe("nanogpt endpoint surface (#9322)", () => {
 
   describe("embeddings", () => {
     it("is registered in EMBEDDING_PROVIDERS", () => {
-      assert.ok(EMBEDDING_PROVIDERS.nanogpt, "nanogpt should be in EMBEDDING_PROVIDERS");
+      assert.ok(
+        EMBEDDING_PROVIDERS.nanogpt,
+        "nanogpt should be in EMBEDDING_PROVIDERS"
+      );
     });
 
     it("resolves nanogpt embedding config", () => {
@@ -109,8 +118,14 @@ describe("nanogpt endpoint surface (#9322)", () => {
     it("has responsesBaseUrl for Responses API", () => {
       const entry = REGISTRY.nanogpt;
       assert.ok(entry, "REGISTRY.nanogpt should be defined");
-      assert.ok(entry.responsesBaseUrl, "nanogpt registry entry should have responsesBaseUrl");
-      assert.equal(entry.responsesBaseUrl, "https://nano-gpt.com/api/v1/responses");
+      assert.ok(
+        entry.responsesBaseUrl,
+        "nanogpt registry entry should have responsesBaseUrl"
+      );
+      assert.equal(
+        entry.responsesBaseUrl,
+        "https://nano-gpt.com/api/v1/responses"
+      );
     });
   });
 });

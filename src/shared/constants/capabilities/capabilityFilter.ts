@@ -89,15 +89,10 @@ function isContextOverflow(
   capabilities: { maxInputTokens: number | null; contextWindow: number | null },
   requirements: { requiredContextTokens: number }
 ): boolean {
-  return (
-    evaluateContextLimit(
-      { maxInputTokens: capabilities.maxInputTokens, contextWindow: capabilities.contextWindow },
-      {
-        estimatedInputTokens: requirements.requiredContextTokens,
-        requiredContextTokens: requirements.requiredContextTokens,
-      }
-    ) === false
-  );
+  return evaluateContextLimit(
+    { maxInputTokens: capabilities.maxInputTokens, contextWindow: capabilities.contextWindow },
+    { estimatedInputTokens: requirements.requiredContextTokens, requiredContextTokens: requirements.requiredContextTokens }
+  ) === false;
 }
 
 function valueContainsImageType(value: Record<string, unknown>): boolean {
@@ -145,9 +140,7 @@ export function buildCapabilityMismatchMessage(
     structured_output: `Provider '${provider}' does not support structured output`,
     context_window: `Request exceeds the context window for ${provider}/${model}`,
   };
-  return (
-    msgs[terminalReason] || `Provider '${provider}' does not support the required capabilities`
-  );
+  return msgs[terminalReason] || `Provider '${provider}' does not support the required capabilities`;
 }
 
 /**
@@ -174,11 +167,8 @@ function collectCapabilityFailures(
     maxOutputTokens: number | null;
   };
 
-  if (
-    requirements.requiresTools &&
-    (caps.supportsTools === false || !caps.toolCalling) &&
-    !providerSupportsEmulatedToolCalling(provider)
-  ) {
+  if (requirements.requiresTools && (caps.supportsTools === false || !caps.toolCalling)
+    && !providerSupportsEmulatedToolCalling(provider)) {
     failures.push("tools");
   }
   if (requirements.requiresVision && caps.supportsVision !== true) {
@@ -213,11 +203,7 @@ export function checkRequestCapabilityFit(
   requirements: RequestCapabilityRequirements,
   provider?: string | null
 ): CapabilityFilterResult {
-  const failures = collectCapabilityFailures(
-    capabilities as Record<string, unknown>,
-    requirements,
-    provider
-  );
+  const failures = collectCapabilityFailures(capabilities as Record<string, unknown>, requirements, provider);
   if (failures.length === 0) {
     return { compatible: true, failures: [] };
   }

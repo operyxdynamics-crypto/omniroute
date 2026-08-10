@@ -1636,9 +1636,7 @@ export function createSSEStream(options: StreamOptions = {}) {
                   // retry." with finish_reason: "stop" — clients (Goose/opencode) feed that
                   // text back as a turn and spin in a retry loop. This restores the #3400
                   // behavior that #3422 inadvertently reverted (regression #3388/#3502).
-                  if (
-                    Array.isArray(parsed.choices) &&
-                    (parsed.choices.length === 0 ||
+                  if (Array.isArray(parsed.choices) && (parsed.choices.length === 0 ||
                       (parsed.choices.length === 1 &&
                         parsed.choices[0]?.delta &&
                         typeof parsed.choices[0].delta === "object" &&

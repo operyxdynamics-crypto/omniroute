@@ -103,13 +103,10 @@ export class AdaptiveAdmissionController {
   private queue: FairCostQueue<QueuedPayload>;
   private virtualQueue: FairCostQueue<{ recordId: string }>;
   /** Per-connection virtual admission lanes (#9654). */
-  private readonly virtualLanes = new Map<
-    string,
-    {
-      queue: FairCostQueue<QueuedPayload>;
-      lastUsedMs: number;
-    }
-  >();
+  private readonly virtualLanes = new Map<string, {
+    queue: FairCostQueue<QueuedPayload>;
+    lastUsedMs: number;
+  }>();
   /** Eviction timer for idle lanes; re-armed when a lane is created. */
   private laneEvictionTimer: unknown = undefined;
   private readonly active = new Map<string, ActiveLeaseRecord>();
@@ -624,10 +621,7 @@ export class AdaptiveAdmissionController {
     }
   }
 
-  private getOrCreateLane(tenantKey: string): {
-    queue: FairCostQueue<QueuedPayload>;
-    lastUsedMs: number;
-  } {
+  private getOrCreateLane(tenantKey: string): { queue: FairCostQueue<QueuedPayload>; lastUsedMs: number } {
     let lane = this.virtualLanes.get(tenantKey);
     if (!lane) {
       // Evict oldest lane if at capacity (LRU).
@@ -733,11 +727,7 @@ export class AdaptiveAdmissionController {
     return count;
   }
 
-  private laneTenantSnapshot(): ReadonlyArray<{
-    tenantKey: string;
-    queuedCount: number;
-    queuedCost: number;
-  }> {
+  private laneTenantSnapshot(): ReadonlyArray<{ tenantKey: string; queuedCount: number; queuedCost: number }> {
     const arr: { tenantKey: string; queuedCount: number; queuedCost: number }[] = [];
     for (const [tenantKey, lane] of this.virtualLanes) {
       arr.push({

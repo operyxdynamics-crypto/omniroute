@@ -131,21 +131,20 @@ test("PerConnectionAdmissionController snapshot does not leak raw keys", () => {
 });
 
 test("admitChatRequest uses per-connection controller by default", async () => {
-  const result = await admitChatRequest(makeRequest({ authorization: "Bearer sk-test-key" }), {
-    largeBodyBytes: 32,
-    hardMaxBytes: 1024,
-  });
+  const result = await admitChatRequest(
+    makeRequest({ authorization: "Bearer sk-test-key" }),
+    { largeBodyBytes: 32, hardMaxBytes: 1024 }
+  );
   assert.equal(result.admit, true);
   if (result.admit) result.lease?.release();
 });
 
 test("admitChatRequest with explicit controller overrides per-connection lookup", async () => {
   const explicitController = new ChatAdmissionController(1);
-  const result = await admitChatRequest(makeRequest({ authorization: "Bearer sk-test-key" }), {
-    controller: explicitController,
-    largeBodyBytes: 32,
-    hardMaxBytes: 1024,
-  });
+  const result = await admitChatRequest(
+    makeRequest({ authorization: "Bearer sk-test-key" }),
+    { controller: explicitController, largeBodyBytes: 32, hardMaxBytes: 1024 }
+  );
   assert.equal(result.admit, true);
   if (result.admit) result.lease?.release();
 });

@@ -461,7 +461,7 @@ test("executeChatWithBreaker preserves account TLS scope when a proxy bypasses t
           ],
           usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
         }),
-        { headers: { "content-type": "application/json" } }
+        { headers: { "content-type": "application/json" } },
       );
     },
   });
