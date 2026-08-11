@@ -113,6 +113,7 @@ export const ENTERPRISE_CLOUD_PROVIDER_IDS = new Set([
 ]);
 
 export const VIDEO_PROVIDER_IDS = new Set([
+  "agnes",
   "runwayml",
   "veoaifree-web",
   "pollinations",
