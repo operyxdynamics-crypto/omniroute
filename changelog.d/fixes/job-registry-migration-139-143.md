@@ -1,0 +1,1 @@
+- fix(db): renumber the job registry migration 139->143 to resolve the ccr_blocks version collision that breaks fresh DB init on release/v3.8.50
