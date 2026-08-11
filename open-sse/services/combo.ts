@@ -69,6 +69,7 @@ import { notifyWebhookEvent } from "../../src/lib/webhookDispatcher";
 import { type ProviderCandidate } from "./autoCombo/scoring.ts";
 import { estimateTokens } from "./contextManager.ts";
 import { getSessionConnection } from "./sessionManager.ts";
+import { getOAuthSessionAvailability } from "./oauthSessionOccupancy.ts";
 import {
   applySessionStickiness,
   normalizeStickinessMessages,
@@ -445,6 +446,9 @@ export async function buildAutoCandidates(
       let quotaCutoffReason: string | undefined;
       const fetcher = getQuotaFetcher(provider);
       const connection = target.connectionId ? connectionById.get(target.connectionId) : undefined;
+      const authType = typeof connection?.authType === "string" ? connection.authType : null;
+      const sessionAvailability =
+        authType === "oauth" ? getOAuthSessionAvailability(target.connectionId, sessionId) : 1;
       // Gate the terminal-status cutoff behind the same opt-in as the quota-percent
       // cutoff (#4483): when quota cutoff is disabled, a connection in a terminal
       // testStatus must still fall through to normal connection-cooldown / model-lockout
@@ -519,6 +523,7 @@ export async function buildAutoCandidates(
         accountTier: "standard" as const,
         quotaResetIntervalSecs: 86400,
         contextAffinity,
+        sessionAvailability,
         resetWindowAffinity,
         quotaCutoffBlocked,
         quotaCutoffReason,
@@ -526,6 +531,7 @@ export async function buildAutoCandidates(
         statusPenaltyReason,
         connectionPoolSize: connectionPoolCounts.get(provider) ?? 1,
         connectionId: target.connectionId ?? undefined,
+        authType,
       };
     })
   );
@@ -697,6 +703,7 @@ export async function handleComboChat({
       allCombos,
       signal,
       hiddenModelsByProvider,
+      relayOptions,
     });
   }
 
@@ -2224,6 +2231,7 @@ async function handleRoundRobinCombo({
   allCombos,
   signal,
   hiddenModelsByProvider = getHiddenModelsByProvider(),
+  relayOptions,
 }: HandleRoundRobinOptions): Promise<Response> {
   const config = settings
     ? resolveComboConfig(combo, settings)
@@ -2449,7 +2457,13 @@ async function handleRoundRobinCombo({
         // stickiness engages on the /v1/responses surface, not just Chat Completions.
         normalizeStickinessMessages(body as { messages?: unknown; input?: unknown })
       );
-  const rrAffinity = applyPromptCacheAffinity(filteredTargets, body, rrAffinityEnabled);
+  const rrAffinity = applyPromptCacheAffinity(
+    filteredTargets,
+    body,
+    rrAffinityEnabled,
+    "global",
+    relayOptions?.sessionId
+  );
   if (rrAffinity.applied) {
     const stickyFirst = _rrSessionSticky.stuck ? _rrSessionSticky.targets[0] : null;
     filteredTargets = stickyFirst
