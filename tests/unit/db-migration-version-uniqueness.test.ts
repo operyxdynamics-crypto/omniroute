@@ -66,3 +66,10 @@ test("quota_pools lives at 085 (renumbered from the 077 collision)", () => {
   assert.ok(streamDefault, "api_key_stream_default_mode migration must exist");
   assert.equal(streamDefault.version, "077", "api_key_stream_default_mode stays at 077");
 });
+
+test("job_registry lives at 143 after the 139 collision", () => {
+  const files = migrationFiles();
+  const jobRegistry = files.find((f) => f.name === "job_registry");
+  assert.ok(jobRegistry, "job_registry migration must exist");
+  assert.equal(jobRegistry.version, "143", "job_registry must be renumbered to 143");
+});

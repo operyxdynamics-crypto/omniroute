@@ -770,6 +770,87 @@ test(
 );
 
 test(
+  "reconcileRenumberedMigrations resolves job_registry 139→143 upgrade path",
+  serial,
+  async () => {
+    const runner = await importFresh("src/lib/db/migrationRunner.ts");
+    const db = createDb();
+
+    try {
+      db.exec(`
+        CREATE TABLE _omniroute_migrations (
+          version TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE jobs (id TEXT PRIMARY KEY);
+        CREATE TABLE job_runs (id INTEGER PRIMARY KEY);
+      `);
+      db.prepare("INSERT INTO _omniroute_migrations (version, name) VALUES (?, ?)").run(
+        "139",
+        "job_registry"
+      );
+
+      withMockedMigrationFs(
+        {
+          "139_ccr_blocks.sql": "CREATE TABLE IF NOT EXISTS ccr_blocks (id TEXT PRIMARY KEY);",
+          "143_job_registry.sql":
+            "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY); " +
+            "CREATE TABLE IF NOT EXISTS job_runs (id INTEGER PRIMARY KEY);",
+        },
+        () => runner.runMigrations(db)
+      );
+
+      const row139 = db
+        .prepare("SELECT version, name FROM _omniroute_migrations WHERE version = ?")
+        .get("139");
+      const row143 = db
+        .prepare("SELECT version, name FROM _omniroute_migrations WHERE version = ?")
+        .get("143");
+
+      assert.equal(row139?.name, "ccr_blocks");
+      assert.equal(row143?.name, "job_registry");
+      assert.equal(
+        db
+          .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+          .get("ccr_blocks")?.name,
+        "ccr_blocks"
+      );
+    } finally {
+      db.close();
+    }
+  }
+);
+
+test("isSchemaAlreadyApplied guards a partially tracked job registry at 143", serial, async () => {
+  const runner = await importFresh("src/lib/db/migrationRunner.ts");
+  const db = createDb();
+
+  try {
+    db.exec(`
+      CREATE TABLE jobs (id TEXT PRIMARY KEY);
+      CREATE TABLE job_runs (id INTEGER PRIMARY KEY);
+    `);
+
+    withMockedMigrationFs(
+      {
+        "143_job_registry.sql":
+          "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY); " +
+          "CREATE TABLE IF NOT EXISTS job_runs (id INTEGER PRIMARY KEY);",
+      },
+      () => runner.runMigrations(db)
+    );
+
+    const row143 = db
+      .prepare("SELECT version, name FROM _omniroute_migrations WHERE version = ?")
+      .get("143");
+    assert.equal(row143?.name, "job_registry");
+  } finally {
+    db.close();
+  }
+});
+
+test(
   "reconcileRenumberedMigrations resolves compression_settings 028→034 upgrade path",
   serial,
   async () => {

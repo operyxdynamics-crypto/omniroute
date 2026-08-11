@@ -487,6 +487,12 @@ function isSchemaAlreadyApplied(
       // but still burn a version-tracking slot mismatch — guard it the same
       // way as the other renumbers for consistency.
       return hasTable(db, "connection_runtime_state");
+    case "143":
+      // Retroactive guard for job_registry renumbered from 139 to 143 to
+      // resolve the collision with ccr_blocks. DBs that already applied the
+      // job registry under the old 139 slot have both tables, so skip the
+      // idempotent migration body and record the new canonical slot.
+      return hasTable(db, "jobs") && hasTable(db, "job_runs");
     default:
       return false;
   }

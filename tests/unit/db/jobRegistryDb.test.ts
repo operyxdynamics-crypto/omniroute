@@ -1,5 +1,5 @@
 /**
- * Tests for jobRegistry persistence (migration 139 + jobRegistryDb.ts).
+ * Tests for jobRegistry persistence (migration 143 + jobRegistryDb.ts).
  *
  * Verifies:
  *  - 3 built-in jobs seeded by the migration
