@@ -17,6 +17,12 @@ export function shouldTripProviderBreakerForResult(
     !isCombo &&
     !isRequestScopedUpstreamFailure({ code: result.errorCode, type: result.errorType }) &&
     !isLocalStreamLifecycleError(result.error) &&
+    // Network-layer errors (ECONNREFUSED, ETIMEDOUT) never reached the provider —
+    // the provider may be healthy, only the network path is broken. OmniRoute's own
+    // rate-limit queue timeouts are backpressure we applied, not a provider failure.
+    result.errorCode !== "proxy_unreachable" &&
+    result.errorCode !== "RATE_LIMIT_QUEUE_TIMEOUT" &&
+    result.errorCode !== "RATE_LIMIT_QUEUE_WEDGED" &&
     PROVIDER_BREAKER_FAILURE_STATUSES.has(Number(result.status))
   );
 }
