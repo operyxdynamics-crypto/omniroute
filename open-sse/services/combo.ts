@@ -175,6 +175,11 @@ export {
 };
 import { applyComboTargetExhaustion } from "./combo/targetExhaustion.ts";
 import {
+  applyNativeCodexTurnPin,
+  getNativeCodexTurnPin,
+  pinNativeCodexTurn,
+} from "./combo/nativeCodexTurnPin.ts";
+import {
   pinIsDurablyUnhealthy,
   tryFusionDispatch,
   tryPinnedModelDispatch,
@@ -572,6 +577,7 @@ export async function handleComboChat({
   apiKeyAllowedConnections = null,
   nesting = null,
   hiddenModelsByProvider = getHiddenModelsByProvider(),
+  clientManagedResponsesContext = false,
 }: HandleComboChatOptions): Promise<Response> {
   const comboCtx = createComboContext({ body, combo, settings, relayOptions, log });
   const {
@@ -685,8 +691,14 @@ export async function handleComboChat({
   });
   if (runtimeUnitDispatch) return runtimeUnitDispatch;
 
-  // Route to round-robin handler if strategy matches
-  if (strategy === "round-robin") {
+  const activeNativeTurnPin = clientManagedResponsesContext
+    ? getNativeCodexTurnPin(body, combo.name)
+    : null;
+
+  // Route new round-robin turns to the specialized handler. A native Codex
+  // continuation with an established provider/account pin must use the common
+  // target pipeline below so it cannot rotate between tool rounds.
+  if (strategy === "round-robin" && !activeNativeTurnPin) {
     return handleRoundRobinCombo({
       body,
       combo,
@@ -697,13 +709,14 @@ export async function handleComboChat({
       allCombos,
       signal,
       hiddenModelsByProvider,
+      clientManagedResponsesContext,
     });
   }
 
-  const maxRetries = config.maxRetries ?? 1;
+  const maxRetries = activeNativeTurnPin ? 0 : (config.maxRetries ?? 1);
   const retryDelayMs = resolveDelayMs(config.retryDelayMs, 2000);
   const fallbackDelayMs = resolveDelayMs(config.fallbackDelayMs, 0);
-  const maxSetRetries = config.maxSetRetries ?? 0;
+  const maxSetRetries = activeNativeTurnPin ? 0 : (config.maxSetRetries ?? 0);
   const setRetryDelayMs = resolveDelayMs(config.setRetryDelayMs, 2000);
 
   const targetResolution = await resolveComboTargetPipeline({
@@ -722,11 +735,25 @@ export async function handleComboChat({
     handleSingleModelWithTimeout,
     buildAutoCandidates,
     hiddenModelsByProvider,
+    clientManagedResponsesContext,
   });
   if ("earlyResponse" in targetResolution) return targetResolution.earlyResponse;
   const { stickyWeightedLimit, getWeightedStepKeyForTarget, preScreenMap } = targetResolution;
   const _sticky = targetResolution.sticky;
   let orderedTargets = targetResolution.orderedTargets;
+  if (activeNativeTurnPin) {
+    orderedTargets = applyNativeCodexTurnPin(orderedTargets, activeNativeTurnPin);
+    if (orderedTargets.length === 0) {
+      return errorResponse(
+        409,
+        "The pinned native Codex turn target is no longer available; the turn cannot be moved to another provider"
+      );
+    }
+    log.info(
+      "COMBO",
+      `Native Codex turn pinned to ${activeNativeTurnPin.modelStr} connection ${activeNativeTurnPin.connectionId.slice(0, 8)}`
+    );
+  }
 
   // #5923 (Finding #4) — reset-window config for the shared per-target quota-
   // exhaustion cutoff below. The "auto" strategy already applies its own cutoff
@@ -1279,6 +1306,15 @@ export async function handleComboChat({
                 latencyMs: Date.now() - startTime,
               });
               return null;
+            }
+
+            if (clientManagedResponsesContext && effectiveConnectionId) {
+              pinNativeCodexTurn({
+                body,
+                comboName: combo.name,
+                target,
+                connectionId: effectiveConnectionId,
+              });
             }
 
             // Success decay: a healthy response walks the model's lockout failure
@@ -2224,6 +2260,7 @@ async function handleRoundRobinCombo({
   allCombos,
   signal,
   hiddenModelsByProvider = getHiddenModelsByProvider(),
+  clientManagedResponsesContext,
 }: HandleRoundRobinOptions): Promise<Response> {
   const config = settings
     ? resolveComboConfig(combo, settings)
@@ -2270,7 +2307,9 @@ async function handleRoundRobinCombo({
   );
   const tagFilteredTargets = await applyRequestTagRouting(orderedTargets, body, log);
   const evalRankedTargets = orderTargetsByEvalScores(tagFilteredTargets, config.evalRouting, log);
-  const knownContextOverflow = getKnownContextOverflow(evalRankedTargets, body);
+  const knownContextOverflow = getKnownContextOverflow(evalRankedTargets, body, {
+    clientManagedResponsesContext,
+  });
   if (knownContextOverflow) {
     return errorResponseWithComboDiagnostics(
       400,
