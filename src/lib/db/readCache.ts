@@ -262,6 +262,11 @@ export function getModelCatalogCacheVersion(): number {
   return modelCatalogCacheVersion;
 }
 
+/** Bump only the unified model-catalog generation. */
+export function invalidateModelCatalogCache(): void {
+  modelCatalogCacheVersion++;
+}
+
 /**
  * Invalidate caches (call after writes to any of: settings, pricing,
  * connections, combos, nodes).
@@ -291,5 +296,5 @@ export function invalidateDbCache(
   // Settings/connections/combos all feed the unified model catalog builder
   // (blockedProviders + hidePaidModels, provider connections + excludedModels,
   // combo definitions, respectively) — pricing does too, via isFreeModel().
-  modelCatalogCacheVersion++;
+  invalidateModelCatalogCache();
 }
